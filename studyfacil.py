@@ -1,38 +1,26 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
+from supabase import create_client
 import os
 
-# Configurações de Identidade
+# Configuração da Página
 st.set_page_config(page_title="StudyFacil", page_icon="🎓", layout="wide")
 
-# --- BANCO DE DADOS ---
-def init_db():
-    conn = sqlite3.connect('studyfacil.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS cursos 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  nome TEXT NOT NULL, 
-                  url TEXT NOT NULL, 
-                  categoria TEXT)''')
-    conn.commit()
-    conn.close()
+# Conexão com Supabase
+URL = st.secrets["SUPABASE_URL"]
+KEY = st.secrets["SUPABASE_KEY"]
+supabase = create_client(URL, KEY)
 
-init_db()
-
-# --- INTERFACE - CABEÇALHO COM LOGO ---
-col_logo, col_titulo = st.columns([1, 4])
-
-with col_logo:
-    # Tenta carregar a logo se o arquivo existir
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=150)
-    else:
-        st.write("🎓") # Emoji reserva caso a logo não esteja na pasta
-
-with col_titulo:
-    st.title("StudyFacil")
-    st.subheader("Sua Central de Cursos Organizada")
+# --- CABEÇALHO ---
+col_logo, col_text = st.columns([1, 4])
+if os.path.exists("logo.png"):
+    with col_logo:
+        st.image("logo.png", width=120)
+    with col_text:
+        st.title("StudyFacil")
+        st.subheader("Sua Central de Cursos Organizada")
+else:
+    st.title("🎓 StudyFacil")
 
 st.divider()
 
