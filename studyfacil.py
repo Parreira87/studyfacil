@@ -6,8 +6,17 @@ import os
 # 1. Configuração da Página e Estilo Profissional
 st.set_page_config(page_title="StudyFacil Pro", page_icon="🎓", layout="wide")
 
+# CSS para esconder o menu do Streamlit, o ícone do GitHub e estilizar os cards
 st.markdown("""
     <style>
+    /* Esconde o menu do Streamlit (canto superior direito) */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Esconde o ícone do GitHub que aparece no deploy do Streamlit Cloud */
+    .stAppDeployButton {display:none;}
+    
     .course-card {
         background-color: #ffffff;
         padding: 1.5rem;
@@ -52,13 +61,11 @@ if st.session_state.user is None:
                 senha = st.text_input("Senha", type="password")
                 if st.form_submit_button("Acessar Sistema"):
                     try:
-                        # Tenta realizar o login no Supabase
                         res = supabase.auth.sign_in_with_password({"email": email, "password": senha})
                         if res.user:
                             st.session_state.user = res.user
                             st.rerun()
                     except Exception as e:
-                        # Exibe o erro real (ex: 'Email not confirmed' se não desativou a trava)
                         st.error(f"Erro no login: {e}")
         
         with tab2:
@@ -69,7 +76,7 @@ if st.session_state.user is None:
                 if st.form_submit_button("Finalizar Cadastro"):
                     try:
                         supabase.auth.sign_up({"email": new_email, "password": new_senha})
-                        st.success("Conta criada! Se você desativou o 'Confirm Email', já pode logar.")
+                        st.success("Conta criada! Já pode tentar o login.")
                     except Exception as e:
                         st.error(f"Erro no cadastro: {e}")
 
@@ -93,7 +100,6 @@ else:
         if st.form_submit_button("Salvar no Banco"):
             if nome and url:
                 if not url.startswith("http"): url = "https://" + url
-                # Salva vinculado ao ID do usuário atual
                 data = {"nome": nome, "url": url, "categoria": cat, "user_id": user_id, "concluido": False}
                 supabase.table("cursos").insert(data).execute()
                 st.rerun()
@@ -115,14 +121,12 @@ else:
 
     # Listagem de Dados do Usuário
     try:
-        # Busca apenas os cursos vinculados ao usuário logado
         response = supabase.table("cursos").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         df = pd.DataFrame(response.data)
     except:
         df = pd.DataFrame()
 
     if not df.empty:
-        # Aplicação dos filtros visuais
         if busca: df = df[df['nome'].str.contains(busca, case=False)]
         if filtro_cat != "Todas": df = df[df['categoria'] == filtro_cat]
 
@@ -139,7 +143,6 @@ else:
             c1, c2, c3 = st.columns([3, 1, 0.5])
             c1.link_button("🚀 Abrir Aula", row['url'], use_container_width=True)
             
-            # Botão de Concluir
             label_btn = "Refazer" if row['concluido'] else "Concluir"
             if c2.button(label_btn, key=f"check_{row['id']}"):
                 supabase.table("cursos").update({"concluido": not row['concluido']}).eq("id", row['id']).execute()
@@ -149,4 +152,4 @@ else:
                 supabase.table("cursos").delete().eq("id", row['id']).execute()
                 st.rerun()
     else:
-        st.info("Sua lista está vazia. Cadastre um curso na lateral!")
+        st.info("Sua lista está vazia.")
