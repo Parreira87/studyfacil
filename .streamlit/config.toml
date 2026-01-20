@@ -1,0 +1,8 @@
+[theme]
+primaryColor = "#F63366"
+backgroundColor = "#FFFFFF"
+
+[server]
+headless = true
+enableCORS = false
+port = 8501
