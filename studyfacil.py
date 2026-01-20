@@ -6,7 +6,7 @@ import os
 # Configuração da Página
 st.set_page_config(page_title="StudyFacil", page_icon="🎓", layout="wide")
 
-# Conexão com Supabase
+# Conexão com Supabase (Pega as chaves dos Secrets do Streamlit)
 URL = st.secrets["SUPABASE_URL"]
 KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(URL, KEY)
@@ -25,27 +25,26 @@ else:
 st.divider()
 
 # --- BARRA LATERAL (CADASTRO) ---
-st.sidebar.image("logo.png") if os.path.exists("logo.png") else None
 st.sidebar.header("📝 Novo Curso")
-
 with st.sidebar.form("form_cadastro", clear_on_submit=True):
     nome = st.text_input("Nome do Curso")
     url = st.text_input("Link (URL)")
     cat = st.selectbox("Categoria", ["Programação", "IA", "Marketing", "Outros"])
-    if st.form_submit_button("Salvar"):
+    if st.form_submit_button("Salvar no Banco"):
         if nome and url:
             if not url.startswith("http"): url = "https://" + url
-            conn = sqlite3.connect('studyfacil.db')
-            conn.execute("INSERT INTO cursos (nome, url, categoria) VALUES (?, ?, ?)", (nome, url, cat))
-            conn.commit()
-            conn.close()
-            st.success("Cadastrado!")
+            # Envia para o Supabase
+            data = {"nome": nome, "url": url, "categoria": cat}
+            supabase.table("cursos").insert(data).execute()
+            st.success("Salvo com sucesso!")
             st.rerun()
 
 # --- LISTAGEM ---
-conn = sqlite3.connect('studyfacil.db')
-df = pd.read_sql_query("SELECT * FROM cursos", conn)
-conn.close()
+try:
+    response = supabase.table("cursos").select("*").order("created_at", desc=True).execute()
+    df = pd.DataFrame(response.data)
+except Exception:
+    df = pd.DataFrame()
 
 if not df.empty:
     for _, row in df.iterrows():
@@ -54,11 +53,8 @@ if not df.empty:
             c1.markdown(f"**{row['nome']}** \n*{row['categoria']}*")
             c2.link_button("🚀 Estudar Agora", row['url'], use_container_width=True)
             if c3.button("🗑️", key=f"del_{row['id']}"):
-                conn = sqlite3.connect('studyfacil.db')
-                conn.execute("DELETE FROM cursos WHERE id=?", (row['id'],))
-                conn.commit()
-                conn.close()
+                supabase.table("cursos").delete().eq("id", row['id']).execute()
                 st.rerun()
             st.divider()
 else:
-    st.info("Cadastre seu primeiro link na barra lateral!")
+    st.info("Nenhum curso salvo no Supabase ainda. Cadastre o primeiro na lateral!")
