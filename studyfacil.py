@@ -33,14 +33,19 @@ with st.sidebar.form("form_cadastro", clear_on_submit=True):
     if st.form_submit_button("Salvar no Banco"):
         if nome and url:
             if not url.startswith("http"): url = "https://" + url
+            # Ajuste: Enviando apenas os campos que você criou manualmente
             data = {"nome": nome, "url": url, "categoria": cat}
-            supabase.table("cursos").insert(data).execute()
-            st.success("Salvo com sucesso!")
-            st.rerun()
+            try:
+                supabase.table("cursos").insert(data).execute()
+                st.success("Salvo com sucesso!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar: {e}")
 
 # --- LISTAGEM ---
 try:
-    response = supabase.table("cursos").select("*").order("created_at", desc=True).execute()
+    # Busca simplificada para evitar erros de ordenação se a coluna não existir
+    response = supabase.table("cursos").select("*").execute()
     df = pd.DataFrame(response.data)
 except Exception:
     df = pd.DataFrame()
@@ -53,7 +58,6 @@ if not df.empty:
             c1.caption(f"Categoria: {row['categoria']}")
             c2.markdown("<br>", unsafe_allow_html=True)
             c2.link_button("🚀 Estudar Agora", row['url'], use_container_width=True)
-            c3.markdown("<br>", unsafe_allow_html=True)
             if c3.button("🗑️", key=f"del_{row['id']}"):
                 supabase.table("cursos").delete().eq("id", row['id']).execute()
                 st.rerun()
