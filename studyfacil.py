@@ -3,25 +3,32 @@ import pandas as pd
 from supabase import create_client
 import os
 
-# 1. Configuração da Página - Forçando a barra lateral aberta no mobile
+# 1. Configuração da Página - Forçando a barra lateral aberta
 st.set_page_config(
     page_title="StudyFacil Pro", 
     page_icon="🎓", 
     layout="wide",
-    initial_sidebar_state="expanded" # Faz a barra lateral aparecer de cara
+    initial_sidebar_state="expanded"
 )
 
-# CSS Avançado: Remove ícones e melhora o layout mobile
+# CSS Avançado: Remove TODOS os ícones técnicos e melhora o layout
 st.markdown("""
     <style>
-    /* Esconde botões do GitHub, Streamlit e menus técnicos */
+    /* 1. Esconde menus padrão e rodapés */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* 2. Remove o botão flutuante 'Manage App' e ícones de deploy */
     .stAppDeployButton {display:none !important;}
     [data-testid="stStatusWidget"] {display:none !important;}
     
-    /* Melhora a visualização em telas pequenas (Responsividade) */
+    /* 3. Remove especificamente os ícones que sobraram no canto inferior (Streamlit/Cloud) */
+    div[data-testid="stDecoration"] {display:none !important;}
+    div[class^="st-emotion-cache-"] button {display:none !important;}
+    .viewerBadge_container__1QSob {display:none !important;}
+    
+    /* 4. Estilo dos Cards de Cursos */
     .course-card {
         background-color: #ffffff;
         padding: 1rem;
@@ -31,9 +38,9 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     
-    /* Garante que os botões ocupem a largura total no celular */
+    /* 5. Responsividade para botões no celular */
     @media (max-width: 640px) {
-        .stButton>button { width: 100% !important; margin-bottom: 5px; }
+        .stButton>button { width: 100% !important; margin-bottom: 8px; height: 45px; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -43,7 +50,7 @@ URL = st.secrets["SUPABASE_URL"]
 KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(URL, KEY)
 
-# --- CATEGORIAS ORGANIZADAS ---
+# --- CATEGORIAS PROFISSIONAIS ---
 categorias_estudo = [
     "IA e Machine Learning", "Desenvolvimento de Software (Web/Mobile)", "Ciência de Dados", 
     "Segurança da Informação", "Cloud Computing", "UX/UI Design", "Administração e Gestão", 
@@ -56,9 +63,9 @@ categorias_estudo = [
 if 'user' not in st.session_state:
     st.session_state.user = None
 
-# --- TELAS DE ACESSO ---
+# --- TELAS DE ACESSO (LOGIN / CADASTRO) ---
 if st.session_state.user is None:
-    col1, col2, col3 = st.columns([0.1, 0.8, 0.1])
+    col1, col2, col3 = st.columns([0.05, 0.9, 0.05])
     with col2:
         st.title("🎓 StudyFacil")
         tab1, tab2 = st.tabs(["Entrar", "Criar Conta"])
@@ -77,17 +84,18 @@ if st.session_state.user is None:
                         st.error(f"Erro: {e}")
         
         with tab2:
+            st.info("Crie sua conta para salvar seus cursos.")
             with st.form("cadastro"):
-                new_email = st.text_input("Novo E-mail")
+                new_email = st.text_input("E-mail")
                 new_senha = st.text_input("Senha (mín. 6 dígitos)", type="password")
-                if st.form_submit_button("Finalizar Cadastro"):
+                if st.form_submit_button("Criar Conta"):
                     try:
                         supabase.auth.sign_up({"email": new_email, "password": new_senha})
-                        st.success("Conta criada! Já pode logar.")
+                        st.success("Cadastro realizado!")
                     except Exception as e:
                         st.error(f"Erro: {e}")
 
-# --- APP PRINCIPAL ---
+# --- APP PRINCIPAL (USUÁRIO LOGADO) ---
 else:
     user_id = st.session_state.user.id
     
@@ -101,9 +109,9 @@ else:
     st.sidebar.divider()
     st.sidebar.header("📝 Novo Curso")
     with st.sidebar.form("add_curso", clear_on_submit=True):
-        nome = st.text_input("Nome do Curso")
-        url = st.text_input("Link (URL)")
-        cat = st.selectbox("Categoria", categorias_estudo)
+        nome = st.text_input("Nome")
+        url = st.text_input("Link URL")
+        cat = st.selectbox("Área", categorias_estudo)
         if st.form_submit_button("Salvar no Banco"):
             if nome and url:
                 if not url.startswith("http"): url = "https://" + url
@@ -111,21 +119,16 @@ else:
                 supabase.table("cursos").insert(data).execute()
                 st.rerun()
 
-    # Cabeçalho Principal
-    col_l, col_t = st.columns([1, 4])
-    if os.path.exists("logo.png"):
-        with col_l: st.image("logo.png", width=80)
-    with col_t:
-        st.title("Meus Estudos")
+    # Título Principal
+    st.title("Meus Estudos")
 
+    # Busca e Filtros - Ajustado para ocupar menos espaço no Mobile
     st.divider()
-
-    # Busca e Filtros - Melhorado para Mobile
     c_busca, c_filtro = st.columns([1, 1])
     busca = c_busca.text_input("🔍 Buscar", placeholder="Nome...")
     filtro_cat = c_filtro.selectbox("Área", ["Todas"] + categorias_estudo)
 
-    # Listagem
+    # Listagem de Dados
     try:
         response = supabase.table("cursos").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         df = pd.DataFrame(response.data)
@@ -139,10 +142,9 @@ else:
         for _, row in df.iterrows():
             st.markdown(f"""<div class="course-card">
                 <h4 style="margin:0;">{'✅ ' if row['concluido'] else '📖 '} {row['nome']}</h4>
-                <p style="font-size: 0.8rem; color: gray;">{row['categoria']}</p>
+                <p style="font-size: 0.8rem; color: gray; margin-top: 5px;">{row['categoria']}</p>
             </div>""", unsafe_allow_html=True)
             
-            # Botões empilhados no mobile para facilitar o toque
             c1, c2, c3 = st.columns([2, 1, 0.5])
             c1.link_button("🚀 Abrir Aula", row['url'], use_container_width=True)
             
