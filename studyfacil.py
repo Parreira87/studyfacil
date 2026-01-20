@@ -6,7 +6,7 @@ import os
 # Configuração da Página
 st.set_page_config(page_title="StudyFacil", page_icon="🎓", layout="wide")
 
-# Conexão com Supabase (Pega as chaves dos Secrets do Streamlit)
+# Conexão com Supabase
 URL = st.secrets["SUPABASE_URL"]
 KEY = st.secrets["SUPABASE_KEY"]
 supabase = create_client(URL, KEY)
@@ -24,7 +24,7 @@ else:
 
 st.divider()
 
-# --- BARRA LATERAL (CADASTRO) ---
+# --- BARRA LATERAL ---
 st.sidebar.header("📝 Novo Curso")
 with st.sidebar.form("form_cadastro", clear_on_submit=True):
     nome = st.text_input("Nome do Curso")
@@ -33,7 +33,6 @@ with st.sidebar.form("form_cadastro", clear_on_submit=True):
     if st.form_submit_button("Salvar no Banco"):
         if nome and url:
             if not url.startswith("http"): url = "https://" + url
-            # Envia para o Supabase
             data = {"nome": nome, "url": url, "categoria": cat}
             supabase.table("cursos").insert(data).execute()
             st.success("Salvo com sucesso!")
@@ -50,11 +49,14 @@ if not df.empty:
     for _, row in df.iterrows():
         with st.container():
             c1, c2, c3 = st.columns([3, 1, 0.5])
-            c1.markdown(f"**{row['nome']}** \n*{row['categoria']}*")
+            c1.markdown(f"### {row['nome']}")
+            c1.caption(f"Categoria: {row['categoria']}")
+            c2.markdown("<br>", unsafe_allow_html=True)
             c2.link_button("🚀 Estudar Agora", row['url'], use_container_width=True)
+            c3.markdown("<br>", unsafe_allow_html=True)
             if c3.button("🗑️", key=f"del_{row['id']}"):
                 supabase.table("cursos").delete().eq("id", row['id']).execute()
                 st.rerun()
             st.divider()
 else:
-    st.info("Nenhum curso salvo no Supabase ainda. Cadastre o primeiro na lateral!")
+    st.info("Nenhum curso salvo no Supabase ainda.")
