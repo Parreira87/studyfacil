@@ -3,29 +3,38 @@ import pandas as pd
 from supabase import create_client
 import os
 
-# 1. Configuração da Página e Estilo Profissional
-st.set_page_config(page_title="StudyFacil Pro", page_icon="🎓", layout="wide")
+# 1. Configuração da Página - Forçando a barra lateral aberta no mobile
+st.set_page_config(
+    page_title="StudyFacil Pro", 
+    page_icon="🎓", 
+    layout="wide",
+    initial_sidebar_state="expanded" # Faz a barra lateral aparecer de cara
+)
 
-# CSS para esconder o menu do Streamlit, o ícone do GitHub e estilizar os cards
+# CSS Avançado: Remove ícones e melhora o layout mobile
 st.markdown("""
     <style>
-    /* Esconde o menu do Streamlit (canto superior direito) */
+    /* Esconde botões do GitHub, Streamlit e menus técnicos */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    .stAppDeployButton {display:none !important;}
+    [data-testid="stStatusWidget"] {display:none !important;}
     
-    /* Esconde o ícone do GitHub que aparece no deploy do Streamlit Cloud */
-    .stAppDeployButton {display:none;}
-    
+    /* Melhora a visualização em telas pequenas (Responsividade) */
     .course-card {
         background-color: #ffffff;
-        padding: 1.5rem;
+        padding: 1rem;
         border-radius: 0.5rem;
         border-left: 0.5rem solid #2E7D32;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         margin-bottom: 1rem;
     }
-    .stButton>button { width: 100%; }
+    
+    /* Garante que os botões ocupem a largura total no celular */
+    @media (max-width: 640px) {
+        .stButton>button { width: 100% !important; margin-bottom: 5px; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -44,13 +53,12 @@ categorias_estudo = [
     "Edição de Vídeo", "Curso Preparatório", "Curso Técnico", "Horas Complementares", "Outros"
 ]
 
-# --- GERENCIAMENTO DE SESSÃO ---
 if 'user' not in st.session_state:
     st.session_state.user = None
 
-# --- TELAS DE ACESSO (LOGIN / CADASTRO) ---
+# --- TELAS DE ACESSO ---
 if st.session_state.user is None:
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([0.1, 0.8, 0.1])
     with col2:
         st.title("🎓 StudyFacil")
         tab1, tab2 = st.tabs(["Entrar", "Criar Conta"])
@@ -66,26 +74,25 @@ if st.session_state.user is None:
                             st.session_state.user = res.user
                             st.rerun()
                     except Exception as e:
-                        st.error(f"Erro no login: {e}")
+                        st.error(f"Erro: {e}")
         
         with tab2:
-            st.info("Cadastre-se para ter sua própria lista de cursos.")
             with st.form("cadastro"):
                 new_email = st.text_input("Novo E-mail")
                 new_senha = st.text_input("Senha (mín. 6 dígitos)", type="password")
                 if st.form_submit_button("Finalizar Cadastro"):
                     try:
                         supabase.auth.sign_up({"email": new_email, "password": new_senha})
-                        st.success("Conta criada! Já pode tentar o login.")
+                        st.success("Conta criada! Já pode logar.")
                     except Exception as e:
-                        st.error(f"Erro no cadastro: {e}")
+                        st.error(f"Erro: {e}")
 
-# --- APP PRINCIPAL (USUÁRIO LOGADO) ---
+# --- APP PRINCIPAL ---
 else:
     user_id = st.session_state.user.id
     
-    # Barra Lateral com Logout
-    st.sidebar.markdown(f"👤 Conectado como:\n**{st.session_state.user.email}**")
+    # Barra Lateral
+    st.sidebar.markdown(f"👤 **{st.session_state.user.email}**")
     if st.sidebar.button("🔴 Sair da Conta", use_container_width=True):
         supabase.auth.sign_out()
         st.session_state.user = None
@@ -104,22 +111,21 @@ else:
                 supabase.table("cursos").insert(data).execute()
                 st.rerun()
 
-    # Cabeçalho Principal com Logo
-    col_l, col_t = st.columns([1, 5])
+    # Cabeçalho Principal
+    col_l, col_t = st.columns([1, 4])
     if os.path.exists("logo.png"):
-        with col_l: st.image("logo.png", width=100)
+        with col_l: st.image("logo.png", width=80)
     with col_t:
         st.title("Meus Estudos")
-        st.caption("Central de Cursos Organizada")
 
     st.divider()
 
-    # Busca e Filtros
-    c_busca, c_filtro = st.columns([3, 1])
-    busca = c_busca.text_input("🔍 Buscar por nome...", placeholder="Ex: Python, Marketing...")
-    filtro_cat = c_filtro.selectbox("Filtrar por Área", ["Todas"] + categorias_estudo)
+    # Busca e Filtros - Melhorado para Mobile
+    c_busca, c_filtro = st.columns([1, 1])
+    busca = c_busca.text_input("🔍 Buscar", placeholder="Nome...")
+    filtro_cat = c_filtro.selectbox("Área", ["Todas"] + categorias_estudo)
 
-    # Listagem de Dados do Usuário
+    # Listagem
     try:
         response = supabase.table("cursos").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         df = pd.DataFrame(response.data)
@@ -130,26 +136,23 @@ else:
         if busca: df = df[df['nome'].str.contains(busca, case=False)]
         if filtro_cat != "Todas": df = df[df['categoria'] == filtro_cat]
 
-        # Backup CSV
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button("📥 Baixar Backup (CSV)", csv, "meus_estudos.csv", use_container_width=True)
-
         for _, row in df.iterrows():
             st.markdown(f"""<div class="course-card">
                 <h4 style="margin:0;">{'✅ ' if row['concluido'] else '📖 '} {row['nome']}</h4>
-                <small><b>Área:</b> {row['categoria']}</small>
+                <p style="font-size: 0.8rem; color: gray;">{row['categoria']}</p>
             </div>""", unsafe_allow_html=True)
             
-            c1, c2, c3 = st.columns([3, 1, 0.5])
+            # Botões empilhados no mobile para facilitar o toque
+            c1, c2, c3 = st.columns([2, 1, 0.5])
             c1.link_button("🚀 Abrir Aula", row['url'], use_container_width=True)
             
             label_btn = "Refazer" if row['concluido'] else "Concluir"
-            if c2.button(label_btn, key=f"check_{row['id']}"):
+            if c2.button(label_btn, key=f"check_{row['id']}", use_container_width=True):
                 supabase.table("cursos").update({"concluido": not row['concluido']}).eq("id", row['id']).execute()
                 st.rerun()
                 
-            if c3.button("🗑️", key=f"del_{row['id']}"):
+            if c3.button("🗑️", key=f"del_{row['id']}", use_container_width=True):
                 supabase.table("cursos").delete().eq("id", row['id']).execute()
                 st.rerun()
     else:
-        st.info("Sua lista está vazia.")
+        st.info("Nenhum curso encontrado.")
